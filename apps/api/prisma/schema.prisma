@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  role         String   @default("user") // guest | user | petition_creator | moderator | admin
+  status       String   @default("active") // active | suspended | deleted
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  petitions        Petition[]
+  signatures       Signature[]
+  donations        Donation[]
+  reviewAssignments ReviewQueue[] @relation("AssignedModerator")
+  adminAuditLogs   AdminAuditLog[]
+
+  @@map("users")
+}
+
+// ── Categories ───────────────────────────────────────────────────────────────
+
+model PetitionCategory {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  nameEn      String?
+  level       Int      @default(1) // 1=대분류, 2=중분류, 3=소분류
+  parentId    String?
+  sortOrder   Int      @default(0)
+  description String?
+  iconUrl     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  parent   PetitionCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children PetitionCategory[] @relation("CategoryTree")
+
+  petitionMappings PetitionCategoryMapping[]
+
+  @@map("petition_categories")
+}
+
+model PetitionCategoryMapping {
+  id           String   @id @default(cuid())
+  petitionId   String
+  categoryCode String
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  petition Petition         @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  category PetitionCategory @relation(fields: [categoryCode], references: [code])
+
+  @@unique([petitionId, categoryCode])
+  @@map("petition_category_mappings")
+}
+
+// ── Petitions ────────────────────────────────────────────────────────────────
+
+model Petition {
+  id                    String   @id @default(cuid())
+  title                 String
+  content               String
+  summary               String?
+  status                String   @default("review") // review | published | rejected | closed | achieved
+  authorId              String
+  regionCode            String?
+  decisionMakerNameRaw  String?
+  hashtags              String[] @default([])
+  signatureCountCached  Int      @default(0)
+  targetSignatureCount  Int      @default(5000)
+  closedAt              DateTime?
+  achievedAt            DateTime?
+  rejectedAt            DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  author           User                      @relation(fields: [authorId], references: [id])
+  categoryMappings PetitionCategoryMapping[]
+  classificationResult PetitionClassificationResult?
+  updates          PetitionUpdate[]
+  signatures       Signature[]
+  donations        Donation[]
+  reviewQueue      ReviewQueue[]
+
+  @@map("petitions")
+}
+
+model PetitionClassificationResult {
+  id                    String   @id @default(cuid())
+  petitionId            String   @unique
+  primaryCategoryCode   String?
+  secondaryCategoryCodes String[] @default([])
+  confidence            Float
+  reviewRequired        Boolean  @default(false)
+  classifierVersion     String
+  classifiedAt          DateTime @default(now())
+
+  petition Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+
+  @@map("petition_classification_results")
+}
+
+model PetitionUpdate {
+  id         String   @id @default(cuid())
+  petitionId String
+  content    String
+  authorId   String
+  createdAt  DateTime @default(now())
+
+  petition Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+
+  @@map("petition_updates")
+}
+
+// ── Signatures ───────────────────────────────────────────────────────────────
+
+model Signature {
+  id                 String   @id @default(cuid())
+  petitionId         String
+  userId             String
+  displayName        String
+  regionCode         String?
+  ageBand            String? // 10s | 20s | 30s | 40s | 50s | 60s | 70plus | unknown
+  gender             String? // male | female | non_binary | prefer_not_to_say
+  consentToStatistics Boolean @default(false)
+  createdAt          DateTime @default(now())
+
+  petition Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([petitionId, userId])
+  @@map("signatures")
+}
+
+// ── Donations ────────────────────────────────────────────────────────────────
+
+model Donation {
+  id           String   @id @default(cuid())
+  userId       String
+  targetType   String   // petition | platform
+  targetId     String?
+  amount       Int      // KRW, stored as integer (won)
+  donationType String   // one_time | recurring
+  billingCycle String?  // monthly | yearly
+  isAnonymous  Boolean  @default(false)
+  message      String?
+  status       String   @default("pending") // pending | completed | failed | cancelled | refunded
+  paidAt       DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id])
+  petition        Petition?        @relation(fields: [targetId], references: [id])
+  paymentAttempts PaymentAttempt[]
+  subscription    BillingSubscription?
+
+  @@map("donations")
+}
+
+model PaymentAttempt {
+  id              String   @id @default(cuid())
+  donationId      String
+  pgTransactionId String?
+  pgProvider      String?  // toss | kakaopay | nice | etc
+  amount          Int
+  status          String   // pending | success | failed
+  failureReason   String?
+  attemptedAt     DateTime @default(now())
+
+  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+
+  @@map("payment_attempts")
+}
+
+model BillingSubscription {
+  id             String    @id @default(cuid())
+  donationId     String    @unique
+  pgSubscriptionId String?
+  status         String    @default("active") // active | paused | cancelled
+  nextBillingAt  DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+
+  @@map("billing_subscriptions")
+}
+
+// ── Regions & Decision Makers ─────────────────────────────────────────────────
+
+model Region {
+  code      String  @id
+  name      String
+  parentCode String?
+  level     Int     @default(1) // 1=시도, 2=시군구
+
+  parent   Region?  @relation("RegionTree", fields: [parentCode], references: [code])
+  children Region[] @relation("RegionTree")
+
+  @@map("regions")
+}
+
+model DecisionMaker {
+  id           String   @id @default(cuid())
+  name         String
+  organization String?
+  role         String?
+  categoryCode String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@map("decision_makers")
+}
+
+// ── Review Queue ──────────────────────────────────────────────────────────────
+
+model ReviewQueue {
+  id                  String    @id @default(cuid())
+  petitionId          String
+  status              String    @default("pending") // pending | in_review | approved | rejected
+  assignedModeratorId String?
+  moderatorNote       String?
+  resolvedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  petition          Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  assignedModerator User?    @relation("AssignedModerator", fields: [assignedModeratorId], references: [id])
+
+  @@map("review_queue")
+}
+
+// ── Admin Audit Log ───────────────────────────────────────────────────────────
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  targetType String?  // user | petition | donation | etc
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  admin User @relation(fields: [adminId], references: [id])
+
+  @@map("admin_audit_logs")
+}
