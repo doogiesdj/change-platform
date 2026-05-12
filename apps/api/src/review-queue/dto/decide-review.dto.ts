@@ -1,9 +1,14 @@
-import { IsString, IsIn, IsOptional, MaxLength } from 'class-validator';
+import { IsString, IsIn, IsOptional, IsNotEmpty, MaxLength, ValidateIf } from 'class-validator';
 
 export class DecideReviewDto {
   @IsString()
-  @IsIn(['approve', 'reject'])
-  decision!: 'approve' | 'reject';
+  @IsIn(['approve', 'reject', 'reclassify'])
+  decision!: 'approve' | 'reject' | 'reclassify';
+
+  @ValidateIf((o: DecideReviewDto) => o.decision === 'reclassify')
+  @IsString()
+  @IsNotEmpty()
+  newCategoryCode?: string;
 
   @IsOptional()
   @IsString()

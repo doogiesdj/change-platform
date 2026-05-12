@@ -9,7 +9,14 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "type-check": "tsc --noEmit",
     "test": "jest",
-    "clean": "rimraf dist"
+    "test:unit": "jest --testPathPattern=\"\\.spec\\.ts$\"",
+    "test:cov": "jest --coverage",
+    "test:watch": "jest --watch",
+    "clean": "rimraf dist",
+    "db:seed": "ts-node -e \"require('tsconfig-paths/register')\" prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "ts-node -P tsconfig.seed.json prisma/seed.ts"
   },
   "dependencies": {
     "@change/shared": "workspace:*",
@@ -35,10 +42,14 @@
     "@nestjs/testing": "^10.0.0",
     "@types/bcrypt": "^5.0.0",
     "@types/express": "^4.17.0",
+    "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
     "@types/passport-jwt": "^4.0.0",
+    "jest": "^29.5.0",
     "prisma": "^5.0.0",
     "rimraf": "^5.0.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0",
     "typescript": "^5.4.0"
   }
 }

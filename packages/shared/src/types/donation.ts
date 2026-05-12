@@ -1,6 +1,6 @@
 export type DonationTargetType = 'petition' | 'platform';
 export type DonationType = 'one_time' | 'recurring';
-export type DonationStatus = 'pending' | 'completed' | 'failed' | 'refunded';
+export type DonationStatus = 'pending' | 'paid' | 'failed' | 'cancelled';
 export type BillingCycle = 'monthly' | 'yearly';
 
 export interface Donation {

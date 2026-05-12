@@ -7,6 +7,11 @@ interface CreateUserInput {
   displayName: string;
 }
 
+interface UpdateProfileInput {
+  displayName?: string;
+  avatarUrl?: string;
+}
+
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
@@ -28,6 +33,13 @@ export class UsersService {
         role: 'user',
         status: 'active',
       },
+    });
+  }
+
+  updateProfile(id: string, input: UpdateProfileInput) {
+    return this.prisma.user.update({
+      where: { id },
+      data: input,
     });
   }
 }

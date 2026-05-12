@@ -1,27 +1,27 @@
 export interface PaginationMeta {
-  total: number;
   page: number;
-  limit: number;
+  pageSize: number;
+  totalItems: number;
   totalPages: number;
 }
 
 export interface PaginatedResponse<T> {
-  data: T[];
+  items: T[];
   meta: PaginationMeta;
 }
 
-export function buildPaginationMeta(total: number, page: number, limit: number): PaginationMeta {
+export function buildPaginationMeta(totalItems: number, page: number, pageSize: number): PaginationMeta {
   return {
-    total,
     page,
-    limit,
-    totalPages: Math.ceil(total / limit),
+    pageSize,
+    totalItems,
+    totalPages: Math.ceil(totalItems / pageSize),
   };
 }
 
-export function buildPaginationQuery(page: number, limit: number) {
+export function buildPaginationQuery(page: number, pageSize: number) {
   return {
-    skip: (page - 1) * limit,
-    take: limit,
+    skip: (page - 1) * pageSize,
+    take: pageSize,
   };
 }

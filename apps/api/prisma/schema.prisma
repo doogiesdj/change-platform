@@ -7,57 +7,201 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ── Users ────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  guest
+  user
+  petition_creator
+  moderator
+  admin
+}
+
+enum UserStatus {
+  active
+  suspended
+  deleted
+}
+
+enum PetitionStatus {
+  review
+  published
+  rejected
+  closed
+  achieved
+}
+
+enum CategorySourceType {
+  auto
+  manual
+}
+
+enum DonationTargetType {
+  petition
+  platform
+}
+
+enum DonationType {
+  one_time
+  recurring
+}
+
+enum DonationStatus {
+  pending
+  processing
+  paid
+  failed
+  cancelled
+  refunded
+}
+
+enum PaymentAttemptStatus {
+  pending
+  success
+  failed
+}
+
+enum BillingCycle {
+  monthly
+  yearly
+}
+
+enum SubscriptionStatus {
+  active
+  paused
+  canceled
+}
+
+enum ReviewQueueStatus {
+  pending
+  approved
+  rejected
+  reclassified
+}
+
+enum DecisionMakerType {
+  government
+  local_government
+  school
+  company
+  public_org
+  other
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// User
+// ─────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String     @id @default(cuid())
+  email        String     @unique
   passwordHash String
   displayName  String
-  role         String   @default("user") // guest | user | petition_creator | moderator | admin
-  status       String   @default("active") // active | suspended | deleted
+  role         UserRole   @default(user)
+  status       UserStatus @default(active)
   avatarUrl    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  // soft delete via status=deleted; deletedAt for query filtering
+  deletedAt    DateTime?
 
-  petitions        Petition[]
-  signatures       Signature[]
-  donations        Donation[]
-  reviewAssignments ReviewQueue[] @relation("AssignedModerator")
-  adminAuditLogs   AdminAuditLog[]
+  petitions            Petition[]
+  petitionUpdates      PetitionUpdate[]
+  signatures           Signature[]
+  donations            Donation[]
+  billingSubscriptions BillingSubscription[]
+  assignedQueues       ReviewQueue[]         @relation("AssignedModerator")
+  reviewedQueues       ReviewQueue[]         @relation("ReviewedBy")
+  auditLogs            AdminAuditLog[]
 
   @@map("users")
 }
 
-// ── Categories ───────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Category (seed table, code as PK, self-referential tree)
+// ─────────────────────────────────────────────────────────────────────────────
 
 model PetitionCategory {
-  id          String   @id @default(cuid())
-  code        String   @unique
-  name        String
-  nameEn      String?
-  level       Int      @default(1) // 1=대분류, 2=중분류, 3=소분류
-  parentId    String?
-  sortOrder   Int      @default(0)
-  description String?
-  iconUrl     String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  // code is the stable, human-readable identifier (e.g. GOV, GOV_LEGISLATION)
+  code       String   @id
+  label      String
+  level      Int      // 1=대분류, 2=중분류, 3=소분류
+  parentCode String?
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  parent   PetitionCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  parent   PetitionCategory?  @relation("CategoryTree", fields: [parentCode], references: [code])
   children PetitionCategory[] @relation("CategoryTree")
 
-  petitionMappings PetitionCategoryMapping[]
+  categoryMappings PetitionCategoryMapping[]
+  decisionMakers   DecisionMaker[]
 
   @@map("petition_categories")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Petition
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Petition {
+  id                   String         @id @default(cuid())
+  authorId             String
+  title                String
+  content              String
+  summary              String?
+  status               PetitionStatus @default(review)
+  regionCode           String?
+  decisionMakerId      String?
+  // raw input when user typed a name not in DecisionMaker table
+  decisionMakerNameRaw String?
+  // cached for fast list queries; updated on signature/donation write
+  primaryCategoryCode  String?
+  signatureCountCached Int            @default(0)
+  donationAmountCached Int            @default(0)
+  hashtags             String[]       @default([])
+  targetSignatureCount Int            @default(5000)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  publishedAt          DateTime?
+  closedAt             DateTime?
+  achievedAt           DateTime?
+  rejectedAt           DateTime?
+  deletedAt            DateTime?
+
+  author                User                           @relation(fields: [authorId], references: [id])
+  region                Region?                        @relation(fields: [regionCode], references: [code])
+  decisionMaker         DecisionMaker?                 @relation(fields: [decisionMakerId], references: [id])
+  categoryMappings      PetitionCategoryMapping[]
+  classificationResults PetitionClassificationResult[]
+  updates               PetitionUpdate[]
+  signatures            Signature[]
+  donations             Donation[]
+  reviewQueue           ReviewQueue?
+
+  @@index([status, deletedAt])
+  @@index([authorId])
+  @@index([primaryCategoryCode])
+  @@index([regionCode])
+  @@map("petitions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Category Mapping (petition ↔ category, N:M with metadata)
+// ─────────────────────────────────────────────────────────────────────────────
+
 model PetitionCategoryMapping {
-  id           String   @id @default(cuid())
+  id           String             @id @default(cuid())
   petitionId   String
   categoryCode String
-  isPrimary    Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  isPrimary    Boolean            @default(false)
+  sourceType   CategorySourceType @default(auto)
+  // confidence from the classifier run that produced this mapping
+  confidence   Float?
+  createdAt    DateTime           @default(now())
 
   petition Petition         @relation(fields: [petitionId], references: [id], onDelete: Cascade)
   category PetitionCategory @relation(fields: [categoryCode], references: [code])
@@ -66,194 +210,276 @@ model PetitionCategoryMapping {
   @@map("petition_category_mappings")
 }
 
-// ── Petitions ────────────────────────────────────────────────────────────────
-
-model Petition {
-  id                    String   @id @default(cuid())
-  title                 String
-  content               String
-  summary               String?
-  status                String   @default("review") // review | published | rejected | closed | achieved
-  authorId              String
-  regionCode            String?
-  decisionMakerNameRaw  String?
-  hashtags              String[] @default([])
-  signatureCountCached  Int      @default(0)
-  targetSignatureCount  Int      @default(5000)
-  closedAt              DateTime?
-  achievedAt            DateTime?
-  rejectedAt            DateTime?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  author           User                      @relation(fields: [authorId], references: [id])
-  categoryMappings PetitionCategoryMapping[]
-  classificationResult PetitionClassificationResult?
-  updates          PetitionUpdate[]
-  signatures       Signature[]
-  donations        Donation[]
-  reviewQueue      ReviewQueue[]
-
-  @@map("petitions")
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Classification Result (history table — multiple runs allowed per petition)
+// ─────────────────────────────────────────────────────────────────────────────
 
 model PetitionClassificationResult {
-  id                    String   @id @default(cuid())
-  petitionId            String   @unique
-  primaryCategoryCode   String?
-  secondaryCategoryCodes String[] @default([])
-  confidence            Float
-  reviewRequired        Boolean  @default(false)
-  classifierVersion     String
-  classifiedAt          DateTime @default(now())
+  id                         String   @id @default(cuid())
+  petitionId                 String
+  classifierVersion          String
+  primaryCategoryCode        String?
+  // stored as JSON arrays for flexibility without extra join tables
+  secondaryCategoryCodesJson Json     @default("[]")
+  matchedKeywordsJson        Json     @default("[]")
+  matchedEntitiesJson        Json     @default("[]")
+  confidence                 Float
+  reviewRequired             Boolean  @default(false)
+  rawReasoningSummary        String?
+  createdAt                  DateTime @default(now())
 
-  petition Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  petition    Petition     @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  // a ReviewQueue may point to this result as the "latest" snapshot at review time
+  reviewQueue ReviewQueue?
 
+  @@index([petitionId])
   @@map("petition_classification_results")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Petition Update (creator's progress posts)
+// ─────────────────────────────────────────────────────────────────────────────
 
 model PetitionUpdate {
   id         String   @id @default(cuid())
   petitionId String
-  content    String
   authorId   String
+  title      String?
+  content    String
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   petition Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  author   User     @relation(fields: [authorId], references: [id])
 
+  @@index([petitionId])
   @@map("petition_updates")
 }
 
-// ── Signatures ───────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Signature
+// ─────────────────────────────────────────────────────────────────────────────
 
 model Signature {
-  id                 String   @id @default(cuid())
-  petitionId         String
-  userId             String
-  displayName        String
-  regionCode         String?
-  ageBand            String? // 10s | 20s | 30s | 40s | 50s | 60s | 70plus | unknown
-  gender             String? // male | female | non_binary | prefer_not_to_say
-  consentToStatistics Boolean @default(false)
-  createdAt          DateTime @default(now())
+  id                  String   @id @default(cuid())
+  petitionId          String
+  // nullable by design for future anonymous-signature policy; MVP enforces non-null at service layer
+  userId              String?
+  displayName         String
+  regionCode          String?
+  // age band instead of DOB to minimize PII (under_19 | 20_29 | 30_39 | 40_49 | 50_59 | 60_plus | unknown)
+  ageBand             String?
+  // (male | female | other | unknown)
+  gender              String?
+  comment             String?
+  consentToStatistics Boolean  @default(false)
+  createdAt           DateTime @default(now())
 
   petition Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id])
+  user     User?    @relation(fields: [userId], references: [id])
 
   @@unique([petitionId, userId])
+  @@index([petitionId])
   @@map("signatures")
 }
 
-// ── Donations ────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Donation
+// ─────────────────────────────────────────────────────────────────────────────
 
 model Donation {
-  id           String   @id @default(cuid())
-  userId       String
-  targetType   String   // petition | platform
-  targetId     String?
-  amount       Int      // KRW, stored as integer (won)
-  donationType String   // one_time | recurring
-  billingCycle String?  // monthly | yearly
-  isAnonymous  Boolean  @default(false)
-  message      String?
-  status       String   @default("pending") // pending | completed | failed | cancelled | refunded
-  paidAt       DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                    String             @id @default(cuid())
+  // nullable for anonymous or guest donations (policy decision)
+  donorUserId           String?
+  targetType            DonationTargetType
+  // required when targetType=petition, null when targetType=platform
+  petitionId            String?
+  // set when this donation was triggered by a recurring subscription
+  billingSubscriptionId String?
+  donationType          DonationType
+  amount                Int                // integer KRW (원)
+  currency              String             @default("KRW")
+  provider              String?            // mock | toss | kakaopay | etc.
+  status                DonationStatus     @default(pending)
+  donorName             String?            // for anonymous donors or display override
+  message               String?
+  idempotencyKey        String?            @unique // prevents double-charge on network retry
+  paymentIntentId       String?            // PG-side order/intent ID (toss: orderId)
+  paidAt                DateTime?
+  refundedAt            DateTime?
+  refundReason          String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
-  user            User             @relation(fields: [userId], references: [id])
-  petition        Petition?        @relation(fields: [targetId], references: [id])
-  paymentAttempts PaymentAttempt[]
-  subscription    BillingSubscription?
+  donorUser           User?                @relation(fields: [donorUserId], references: [id])
+  petition            Petition?            @relation(fields: [petitionId], references: [id])
+  billingSubscription BillingSubscription? @relation(fields: [billingSubscriptionId], references: [id])
+  paymentAttempts     PaymentAttempt[]
 
+  @@index([donorUserId])
+  @@index([petitionId])
+  @@index([status])
   @@map("donations")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Payment Attempt (immutable audit trail of PG calls)
+// ─────────────────────────────────────────────────────────────────────────────
+
 model PaymentAttempt {
-  id              String   @id @default(cuid())
-  donationId      String
-  pgTransactionId String?
-  pgProvider      String?  // toss | kakaopay | nice | etc
-  amount          Int
-  status          String   // pending | success | failed
-  failureReason   String?
-  attemptedAt     DateTime @default(now())
+  id                    String               @id @default(cuid())
+  donationId            String
+  provider              String
+  providerTransactionId String?
+  // raw request/response payloads — mask PII before storing
+  requestPayloadJson    Json?
+  responsePayloadJson   Json?
+  status                PaymentAttemptStatus
+  attemptedAt           DateTime             @default(now())
+  createdAt             DateTime             @default(now())
 
   donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
 
+  @@index([donationId])
   @@map("payment_attempts")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Billing Subscription (recurring payment plan — generates Donations over time)
+// ─────────────────────────────────────────────────────────────────────────────
+
 model BillingSubscription {
-  id             String    @id @default(cuid())
-  donationId     String    @unique
-  pgSubscriptionId String?
-  status         String    @default("active") // active | paused | cancelled
-  nextBillingAt  DateTime?
-  cancelledAt    DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                     String             @id @default(cuid())
+  donorUserId            String
+  targetType             DonationTargetType
+  petitionId             String?
+  amount                 Int
+  currency               String             @default("KRW")
+  billingCycle           BillingCycle
+  provider               String?
+  providerSubscriptionId String?
+  status                 SubscriptionStatus @default(active)
+  startedAt              DateTime           @default(now())
+  nextBillingAt          DateTime?
+  canceledAt             DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
-  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  donorUser User       @relation(fields: [donorUserId], references: [id])
+  donations Donation[]
 
+  @@index([donorUserId])
   @@map("billing_subscriptions")
 }
 
-// ── Regions & Decision Makers ─────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Region (seed/lookup table)
+// ─────────────────────────────────────────────────────────────────────────────
 
 model Region {
-  code      String  @id
-  name      String
+  code       String  @id
+  label      String
+  level      Int     // 1=시도, 2=시군구, 3=읍면동
   parentCode String?
-  level     Int     @default(1) // 1=시도, 2=시군구
+  sortOrder  Int     @default(0)
+  isActive   Boolean @default(true)
 
   parent   Region?  @relation("RegionTree", fields: [parentCode], references: [code])
   children Region[] @relation("RegionTree")
 
+  petitions Petition[]
+
   @@map("regions")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Decision Maker (target institution / person of a petition)
+// ─────────────────────────────────────────────────────────────────────────────
+
 model DecisionMaker {
-  id           String   @id @default(cuid())
-  name         String
-  organization String?
-  role         String?
-  categoryCode String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  id             String            @id @default(cuid())
+  name           String
+  type           DecisionMakerType
+  // normalized form for deduplication and search (e.g. "교육부" → "ministry_of_education")
+  normalizedName String
+  categoryCode   String?
+  regionCode     String?
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  category  PetitionCategory? @relation(fields: [categoryCode], references: [code])
+  petitions Petition[]
 
   @@map("decision_makers")
 }
 
-// ── Review Queue ──────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Review Queue (one entry per petition, tracks moderation workflow)
+// ─────────────────────────────────────────────────────────────────────────────
 
 model ReviewQueue {
-  id                  String    @id @default(cuid())
-  petitionId          String
-  status              String    @default("pending") // pending | in_review | approved | rejected
-  assignedModeratorId String?
-  moderatorNote       String?
-  resolvedAt          DateTime?
-  createdAt           DateTime  @default(now())
+  id                           String            @id @default(cuid())
+  petitionId                   String            @unique
+  // snapshot of the classification result that triggered this review
+  latestClassificationResultId String?           @unique
+  reviewStatus                 ReviewQueueStatus @default(pending)
+  // why this petition entered the queue (low_confidence | policy | manual | etc.)
+  reviewReason                 String?
+  assignedModeratorId          String?
+  reviewedById                 String?
+  reviewedAt                   DateTime?
+  note                         String?
+  createdAt                    DateTime          @default(now())
+  updatedAt                    DateTime          @updatedAt
 
-  petition          Petition @relation(fields: [petitionId], references: [id], onDelete: Cascade)
-  assignedModerator User?    @relation("AssignedModerator", fields: [assignedModeratorId], references: [id])
+  petition                   Petition                       @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  latestClassificationResult PetitionClassificationResult?  @relation(fields: [latestClassificationResultId], references: [id])
+  assignedModerator          User?                          @relation("AssignedModerator", fields: [assignedModeratorId], references: [id])
+  reviewedBy                 User?                          @relation("ReviewedBy", fields: [reviewedById], references: [id])
 
-  @@map("review_queue")
+  @@index([reviewStatus])
+  @@map("review_queues")
 }
 
-// ── Admin Audit Log ───────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Webhook Event (idempotency guard for PG callbacks)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String
+  eventId     String
+  eventType   String
+  rawPayload  Json
+  processed   Boolean   @default(false)
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([provider, eventId])
+  @@map("webhook_events")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin Audit Log (append-only; never updated or deleted)
+// ─────────────────────────────────────────────────────────────────────────────
 
 model AdminAuditLog {
-  id         String   @id @default(cuid())
-  adminId    String
-  action     String
-  targetType String?  // user | petition | donation | etc
-  targetId   String?
-  metadata   Json?
-  createdAt  DateTime @default(now())
+  id           String   @id @default(cuid())
+  actorUserId  String
+  actionType   String   // approve | reject | reclassify | change_role | etc.
+  targetType   String   // petition | user | review_queue | etc.
+  targetId     String?
+  // mask PII in before/after before persisting
+  beforeJson   Json?
+  afterJson    Json?
+  metadataJson Json?
+  createdAt    DateTime @default(now())
 
-  admin User @relation(fields: [adminId], references: [id])
+  actor User @relation(fields: [actorUserId], references: [id])
 
+  @@index([actorUserId])
+  @@index([targetType, targetId])
   @@map("admin_audit_logs")
 }

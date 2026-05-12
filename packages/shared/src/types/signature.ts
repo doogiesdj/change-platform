@@ -1,5 +1,5 @@
-export type AgeBand = '10s' | '20s' | '30s' | '40s' | '50s' | '60s' | '70plus' | 'unknown';
-export type Gender = 'male' | 'female' | 'non_binary' | 'prefer_not_to_say';
+export type AgeBand = 'under_19' | '20_29' | '30_39' | '40_49' | '50_59' | '60_plus' | 'unknown';
+export type Gender = 'male' | 'female' | 'other' | 'unknown';
 
 export interface Signature {
   id: string;

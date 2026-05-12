@@ -1,6 +1,7 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import type { UserRole } from '@change/shared';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -36,8 +37,21 @@ export class AuthService {
     return this.signToken(user);
   }
 
-  private signToken(user: { id: string; email: string; role: string }) {
+  async getMe(userId: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    const { passwordHash: _, ...safe } = user;
+    return safe;
+  }
+
+  private signToken(user: { id: string; email: string; displayName: string; role: UserRole }) {
     const payload = { sub: user.id, email: user.email, role: user.role };
-    return { accessToken: this.jwtService.sign(payload) };
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      role: user.role,
+      accessToken: this.jwtService.sign(payload),
+    };
   }
 }

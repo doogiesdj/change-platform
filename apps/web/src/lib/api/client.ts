@@ -21,7 +21,8 @@ async function request<T>(
     throw new Error(errorData?.error?.message ?? `HTTP ${res.status}`);
   }
 
-  return res.json() as T;
+  const envelope = await res.json() as { success: true; data: T };
+  return envelope.data;
 }
 
 export const apiClient = {

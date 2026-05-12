@@ -7,7 +7,7 @@ export class CategoriesService {
 
   findAll() {
     return this.prisma.petitionCategory.findMany({
-      where: { parentId: null },
+      where: { parentCode: null },
       include: {
         children: {
           include: { children: true },

@@ -1,5 +1,17 @@
 export type PetitionStatus = 'review' | 'published' | 'rejected' | 'closed' | 'achieved';
 
+export interface PetitionAuthor {
+  id: string;
+  displayName: string;
+}
+
+export interface PetitionCategoryItem {
+  code: string;
+  label: string;
+  isPrimary: boolean;
+}
+
+/** Shape returned by GET /petitions/:id */
 export interface Petition {
   id: string;
   authorId: string;
@@ -8,25 +20,38 @@ export interface Petition {
   summary: string | null;
   status: PetitionStatus;
   regionCode: string | null;
-  decisionMakerId: string | null;
-  decisionMakerNameRaw: string | null;
   primaryCategoryCode: string | null;
-  signatureCountCached: number;
-  donationAmountCached: number;
-  createdAt: Date;
-  updatedAt: Date;
-  publishedAt: Date | null;
-  closedAt: Date | null;
+  author: PetitionAuthor;
+  decisionMaker: { id: string; name: string } | null;
+  categories: PetitionCategoryItem[];
+  signatureCount: number;
+  donationAmount: number;
+  targetSignatureCount: number | null;
+  createdAt: string;
+  publishedAt: string | null;
 }
 
+/** Shape returned by GET /petitions list */
 export interface PetitionListItem {
   id: string;
   title: string;
-  summary: string | null;
   status: PetitionStatus;
   primaryCategoryCode: string | null;
-  signatureCountCached: number;
-  createdAt: Date;
+  regionCode: string | null;
+  signatureCount: number;
+  donationAmount: number;
+  createdAt: string;
+}
+
+/** Shape returned by POST /petitions */
+export interface PetitionCreated {
+  id: string;
+  title: string;
+  content: string;
+  status: PetitionStatus;
+  authorId: string;
+  primaryCategoryCode: string | null;
+  createdAt: string;
 }
 
 export interface PetitionCategoryMapping {

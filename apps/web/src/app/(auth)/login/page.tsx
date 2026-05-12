@@ -2,22 +2,30 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, error } = useAuth();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect') ?? '/';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    login({ email, password });
+    login({ email, password }, redirect);
   };
 
   return (
     <div className="max-w-md mx-auto px-4 py-20">
       <h1 className="text-2xl font-bold text-gray-900 mb-8 text-center">로그인</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+            {error.message}
+          </div>
+        )}
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
             이메일

@@ -1,19 +1,26 @@
-import { Controller, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, HttpCode, HttpStatus } from '@nestjs/common';
 import { SignaturesService } from './signatures.service';
 import { CreateSignatureDto } from './dto/create-signature.dto';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { Public } from '../common/decorators/public.decorator';
+import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 
 @Controller('petitions/:petitionId/signatures')
-@UseGuards(JwtAuthGuard)
 export class SignaturesController {
   constructor(private signaturesService: SignaturesService) {}
 
   @Post()
-  create(
+  @HttpCode(HttpStatus.CREATED)
+  async create(
     @Param('petitionId') petitionId: string,
     @Body() dto: CreateSignatureDto,
-    @Request() req: { user: { id: string } },
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.signaturesService.create(petitionId, dto, req.user.id);
+    return this.signaturesService.create(petitionId, dto, user.id);
+  }
+
+  @Get('stats')
+  @Public()
+  async getStats(@Param('petitionId') petitionId: string) {
+    return this.signaturesService.getStats(petitionId);
   }
 }

@@ -1,19 +1,36 @@
-import { Controller, Get, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Param, Body, Query } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser, type CurrentUserPayload } from '../common/decorators/current-user.decorator';
 
 @Controller('admin')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
 export class AdminController {
   constructor(private adminService: AdminService) {}
 
-  @Get('stats')
-  getDashboardStats() {
-    return this.adminService.getDashboardStats();
+  @Roles('admin', 'moderator')
+  @Get('dashboard/overview')
+  getDashboardOverview() {
+    return this.adminService.getDashboardOverview();
+  }
+
+  @Roles('admin', 'moderator')
+  @Get('dashboard/signatures')
+  getDashboardSignatures() {
+    return this.adminService.getDashboardSignatures();
+  }
+
+  @Roles('admin', 'moderator')
+  @Get('dashboard/donations')
+  getDashboardDonations() {
+    return this.adminService.getDashboardDonations();
+  }
+
+  @Roles('admin', 'moderator')
+  @Get('dashboard/petitions')
+  getDashboardPetitions() {
+    return this.adminService.getDashboardPetitions();
   }
 
   @Get('users')
@@ -25,8 +42,12 @@ export class AdminController {
   }
 
   @Patch('users/:id/role')
-  updateUserRole(@Param('id') id: string, @Body() dto: UpdateUserRoleDto) {
-    return this.adminService.updateUserRole(id, dto.role);
+  updateUserRole(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserRoleDto,
+    @CurrentUser() actor: CurrentUserPayload,
+  ) {
+    return this.adminService.updateUserRole(id, dto.role, actor.id);
   }
 
   @Get('audit-logs')
@@ -35,5 +56,10 @@ export class AdminController {
     @Query('limit') limit = '50',
   ) {
     return this.adminService.getAuditLogs(Number(page), Number(limit));
+  }
+
+  @Post('reclassify')
+  reclassifyAll() {
+    return this.adminService.reclassifyAll();
   }
 }

@@ -1,5 +1,7 @@
-import { IsOptional, IsString, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
+
+const PETITION_STATUSES = ['review', 'published', 'rejected', 'closed', 'achieved'] as const;
 
 export class PetitionQueryDto {
   @IsOptional()
@@ -11,11 +13,11 @@ export class PetitionQueryDto {
   regionCode?: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(PETITION_STATUSES)
   status?: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(['latest', 'popular'])
   sort?: 'latest' | 'popular';
 
   @IsOptional()
@@ -29,5 +31,5 @@ export class PetitionQueryDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  limit?: number = 20;
+  pageSize?: number = 20;
 }

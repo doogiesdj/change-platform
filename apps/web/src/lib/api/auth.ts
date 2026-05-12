@@ -11,22 +11,18 @@ export interface RegisterPayload {
   displayName: string;
 }
 
-export interface AuthResponse {
-  data: {
-    accessToken: string;
-    user: {
-      id: string;
-      email: string;
-      displayName: string;
-      role: string;
-    };
-  };
+export interface AuthData {
+  accessToken: string;
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
 }
 
 export function login(payload: LoginPayload) {
-  return apiClient.post<AuthResponse>('/auth/login', payload);
+  return apiClient.post<AuthData>('/auth/login', payload);
 }
 
 export function register(payload: RegisterPayload) {
-  return apiClient.post<AuthResponse>('/auth/register', payload);
+  return apiClient.post<AuthData>('/auth/register', payload);
 }
