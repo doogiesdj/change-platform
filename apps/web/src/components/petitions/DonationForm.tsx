@@ -8,7 +8,7 @@ import { apiClient } from '@/lib/api/client';
 import { Button } from '@/components/ui/Button';
 
 interface Props {
-  petitionId: string;
+  petitionId?: string;
 }
 
 interface IntentResponse {
@@ -29,6 +29,8 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string; desc
 
 export function DonationForm({ petitionId }: Props) {
   const [amount, setAmount] = useState<number>(10000);
+  const [isCustom, setIsCustom] = useState(false);
+  const [customInput, setCustomInput] = useState('');
   const [step, setStep] = useState<Step>('select');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [cardNumber, setCardNumber] = useState('');
@@ -40,8 +42,8 @@ export function DonationForm({ petitionId }: Props) {
   const intentMutation = useMutation({
     mutationFn: () =>
       apiClient.post<IntentResponse>('/donations/intent', {
-        targetType: 'petition',
-        petitionId,
+        targetType: petitionId ? 'petition' : 'platform',
+        ...(petitionId ? { petitionId } : {}),
         amount,
         donationType: 'one_time',
       }),
@@ -373,9 +375,9 @@ export function DonationForm({ petitionId }: Props) {
           <button
             key={preset}
             type="button"
-            onClick={() => setAmount(preset)}
+            onClick={() => { setAmount(preset); setIsCustom(false); setCustomInput(''); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-              amount === preset
+              !isCustom && amount === preset
                 ? 'bg-primary-600 text-white border-primary-600'
                 : 'border-gray-300 text-gray-700 hover:border-primary-400'
             }`}
@@ -383,15 +385,37 @@ export function DonationForm({ petitionId }: Props) {
             {preset.toLocaleString()}원
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => { setIsCustom(true); setCustomInput(String(amount)); }}
+          className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+            isCustom
+              ? 'bg-primary-600 text-white border-primary-600'
+              : 'border-gray-300 text-gray-700 hover:border-primary-400'
+          }`}
+        >
+          직접입력
+        </button>
       </div>
-      <input
-        type="number"
-        value={amount}
-        onChange={(e) => setAmount(Number(e.target.value))}
-        min={1000}
-        step={1000}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-      />
+      {isCustom && (
+        <div className="relative">
+          <input
+            type="number"
+            value={customInput}
+            onChange={(e) => {
+              setCustomInput(e.target.value);
+              const val = Number(e.target.value);
+              if (val >= 1000) setAmount(val);
+            }}
+            min={1000}
+            step={1000}
+            placeholder="금액 입력 (최소 1,000원)"
+            autoFocus
+            className="w-full px-3 py-2 pr-8 border border-primary-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">원</span>
+        </div>
+      )}
       <Button type="submit" disabled={amount < 1000}>
         다음 — {amount.toLocaleString()}원
       </Button>
