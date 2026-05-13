@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { PetitionListItem } from '@change/shared';
 import { StatusBadge } from '@/components/ui/Badge';
 
@@ -31,8 +34,15 @@ interface Props {
 }
 
 export function PetitionCard({ petition }: Props) {
+  const router = useRouter();
   const target = DEFAULT_TARGET;
   const progress = Math.min(Math.round((petition.signatureCount / target) * 100), 100);
+
+  function handleCommentClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/petitions/${petition.id}#comments`);
+  }
 
   return (
     <Link href={`/petitions/${petition.id}`} className="block group">
@@ -63,7 +73,18 @@ export function PetitionCard({ petition }: Props) {
               style={{ width: `${progress}%` }}
             />
           </div>
-          <p className="text-xs text-gray-400">{formatDate(petition.createdAt)}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-400">{formatDate(petition.createdAt)}</p>
+            <button
+              onClick={handleCommentClick}
+              className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              {petition.commentCount ?? 0}
+            </button>
+          </div>
         </div>
       </article>
     </Link>

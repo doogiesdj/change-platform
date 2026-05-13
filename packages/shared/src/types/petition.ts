@@ -40,7 +40,26 @@ export interface PetitionListItem {
   regionCode: string | null;
   signatureCount: number;
   donationAmount: number;
+  commentCount: number;
   createdAt: string;
+}
+
+export interface CommentAuthor {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+export interface Comment {
+  id: string;
+  petitionId: string;
+  authorId: string;
+  content: string;
+  parentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  author: CommentAuthor;
+  replies: Omit<Comment, 'replies'>[];
 }
 
 /** Shape returned by POST /petitions */

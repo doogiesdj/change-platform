@@ -7,6 +7,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
 import { SignatureForm } from './SignatureForm';
 import { DonationForm } from './DonationForm';
+import { CommentSection } from './CommentSection';
 
 const DEFAULT_TARGET = 5000;
 
@@ -234,6 +235,8 @@ export function PetitionDetail({ petitionId }: Props) {
       </div>
 
       <PetitionUpdatesSection petitionId={petition.id} authorId={petition.authorId} />
+
+      <CommentSection petitionId={petition.id} />
     </div>
   );
 }
