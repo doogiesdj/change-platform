@@ -25,20 +25,20 @@ export function Header() {
             <div className="w-20 h-8 bg-gray-100 rounded-lg animate-pulse" />
           ) : isAuthenticated && user ? (
             <div className="flex items-center gap-3">
-              {isAdminOrMod && (
-                <Link
-                  href="/admin"
-                  className="text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
-                >
-                  관리자
-                </Link>
-              )}
               <Link
                 href="/my"
                 className="text-sm font-medium text-gray-700 hover:text-primary-700 transition-colors"
               >
                 {user.displayName}
               </Link>
+              {isAdminOrMod && (
+                <Link
+                  href="/admin"
+                  className="text-sm font-medium px-3 py-1 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition-colors"
+                >
+                  관리 대시보드
+                </Link>
+              )}
               <button
                 onClick={logout}
                 className="text-sm font-medium px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
@@ -47,12 +47,20 @@ export function Header() {
               </button>
             </div>
           ) : (
-            <Link
-              href="/login"
-              className="text-sm font-medium px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              로그인
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/admin/login"
+                className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                관리자
+              </Link>
+              <Link
+                href="/login"
+                className="text-sm font-medium px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                로그인
+              </Link>
+            </div>
           )}
         </nav>
       </div>

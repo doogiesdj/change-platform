@@ -124,10 +124,22 @@ export class AdminService {
     };
   }
 
-  async findUsers(page: number, limit: number) {
+  async findUsers(page: number, limit: number, search?: string, role?: string, status?: string) {
     const skip = (page - 1) * limit;
+
+    const where: import('@prisma/client').Prisma.UserWhereInput = {};
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { displayName: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (role) where.role = role as UserRole;
+    if (status) where.status = status as import('@prisma/client').UserStatus;
+
     const [data, total] = await Promise.all([
       this.prisma.user.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -140,7 +152,7 @@ export class AdminService {
           createdAt: true,
         },
       }),
-      this.prisma.user.count(),
+      this.prisma.user.count({ where }),
     ]);
     return { data, total };
   }
@@ -163,6 +175,34 @@ export class AdminService {
         targetId: userId,
         beforeJson: { role: user.role },
         afterJson: { role },
+      },
+    });
+
+    return updated;
+  }
+
+  async updateUserStatus(userId: string, status: 'active' | 'suspended' | 'deleted', actorId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+
+    const updateData: import('@prisma/client').Prisma.UserUpdateInput = { status };
+    if (status === 'deleted') updateData.deletedAt = new Date();
+    if (status === 'active') updateData.deletedAt = null;
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: { id: true, email: true, role: true, status: true },
+    });
+
+    await this.prisma.adminAuditLog.create({
+      data: {
+        actorUserId: actorId,
+        actionType: 'user_status_update',
+        targetType: 'user',
+        targetId: userId,
+        beforeJson: { status: user.status },
+        afterJson: { status },
       },
     });
 

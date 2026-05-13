@@ -6,6 +6,10 @@ import { REVIEW_STATUS, REVIEW_DECISION, type ReviewDecision, PETITION_STATUS } 
 export class ReviewQueueService {
   constructor(private prisma: PrismaService) {}
 
+  findPending() {
+    return this.findAll(REVIEW_STATUS.PENDING);
+  }
+
   findAll(status?: string) {
     const VALID_STATUSES = [
       REVIEW_STATUS.PENDING,

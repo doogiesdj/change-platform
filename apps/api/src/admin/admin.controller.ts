@@ -1,6 +1,7 @@
 import { Controller, Get, Patch, Post, Param, Body, Query } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, type CurrentUserPayload } from '../common/decorators/current-user.decorator';
 
@@ -37,8 +38,11 @@ export class AdminController {
   findUsers(
     @Query('page') page = '1',
     @Query('limit') limit = '20',
+    @Query('search') search?: string,
+    @Query('role') role?: string,
+    @Query('status') status?: string,
   ) {
-    return this.adminService.findUsers(Number(page), Number(limit));
+    return this.adminService.findUsers(Number(page), Number(limit), search, role, status);
   }
 
   @Patch('users/:id/role')
@@ -48,6 +52,15 @@ export class AdminController {
     @CurrentUser() actor: CurrentUserPayload,
   ) {
     return this.adminService.updateUserRole(id, dto.role, actor.id);
+  }
+
+  @Patch('users/:id/status')
+  updateUserStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserStatusDto,
+    @CurrentUser() actor: CurrentUserPayload,
+  ) {
+    return this.adminService.updateUserStatus(id, dto.status, actor.id);
   }
 
   @Get('audit-logs')

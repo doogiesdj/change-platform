@@ -87,12 +87,22 @@ export const adminApi = {
     apiClient.get<DashboardDonations>('/admin/dashboard/donations'),
   getDashboardPetitions: () =>
     apiClient.get<DashboardPetitions>('/admin/dashboard/petitions'),
-  getUsers: (page = 1, limit = 20) =>
-    apiClient.get<AdminUserList>(`/admin/users?page=${page}&limit=${limit}`),
+  getUsers: (page = 1, limit = 20, search?: string, role?: string, status?: string) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (search) params.set('search', search);
+    if (role) params.set('role', role);
+    if (status) params.set('status', status);
+    return apiClient.get<AdminUserList>(`/admin/users?${params}`);
+  },
   updateUserRole: (id: string, role: string) =>
     apiClient.patch<{ id: string; email: string; role: string }>(
       `/admin/users/${id}/role`,
       { role },
+    ),
+  updateUserStatus: (id: string, status: 'active' | 'suspended' | 'deleted') =>
+    apiClient.patch<{ id: string; email: string; role: string; status: string }>(
+      `/admin/users/${id}/status`,
+      { status },
     ),
   getReviewQueue: (status?: string) =>
     apiClient.get<ReviewQueueItem[]>(`/admin/review-queue${status ? `?status=${status}` : ''}`),

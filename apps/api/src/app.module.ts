@@ -14,6 +14,7 @@ import { ReviewQueueModule } from './review-queue/review-queue.module';
 import { ClassificationModule } from './classification/classification.module';
 import { AdminModule } from './admin/admin.module';
 import { HealthModule } from './health/health.module';
+import { CommentsModule } from './comments/comments.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import configuration from './config/configuration';
@@ -36,6 +37,7 @@ import configuration from './config/configuration';
     ClassificationModule,
     AdminModule,
     HealthModule,
+    CommentsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -37,10 +37,11 @@ export function useCurrentUser() {
   const logout = () => {
     localStorage.removeItem('token');
     document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    queryClient.removeQueries({ queryKey: ['auth', 'me'] });
+    queryClient.clear();
     setHasToken(false);
     toast.success('로그아웃되었습니다.');
     router.push('/');
+    router.refresh();
   };
 
   return {
