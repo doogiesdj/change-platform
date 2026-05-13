@@ -26,3 +26,19 @@ export function login(payload: LoginPayload) {
 export function register(payload: RegisterPayload) {
   return apiClient.post<AuthData>('/auth/register', payload);
 }
+
+export function forgotPassword(email: string) {
+  return apiClient.post<{ message: string }>('/auth/forgot-password', { email });
+}
+
+export function resetPassword(token: string, newPassword: string) {
+  return apiClient.post<{ message: string }>('/auth/reset-password', { token, newPassword });
+}
+
+export function changePassword(currentPassword: string, newPassword: string) {
+  return apiClient.patch<{ message: string }>('/users/me/password', { currentPassword, newPassword });
+}
+
+export function deleteAccount() {
+  return apiClient.delete<{ message: string }>('/users/me');
+}

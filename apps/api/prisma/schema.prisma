@@ -101,11 +101,13 @@ model User {
   displayName  String
   role         UserRole   @default(user)
   status       UserStatus @default(active)
-  avatarUrl    String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  avatarUrl           String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
   // soft delete via status=deleted; deletedAt for query filtering
-  deletedAt    DateTime?
+  deletedAt           DateTime?
+  passwordResetToken  String?
+  passwordResetExpiry DateTime?
 
   petitions            Petition[]
   petitionUpdates      PetitionUpdate[]
@@ -115,6 +117,7 @@ model User {
   assignedQueues       ReviewQueue[]         @relation("AssignedModerator")
   reviewedQueues       ReviewQueue[]         @relation("ReviewedBy")
   auditLogs            AdminAuditLog[]
+  comments             Comment[]
 
   @@map("users")
 }
@@ -181,6 +184,7 @@ model Petition {
   signatures            Signature[]
   donations             Donation[]
   reviewQueue           ReviewQueue?
+  comments              Comment[]
 
   @@index([status, deletedAt])
   @@index([authorId])
@@ -459,6 +463,30 @@ model WebhookEvent {
 
   @@unique([provider, eventId])
   @@map("webhook_events")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Comment (petition comments with optional threading)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Comment {
+  id         String    @id @default(cuid())
+  petitionId String
+  authorId   String
+  content    String
+  parentId   String?
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  petition Petition  @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  author   User      @relation(fields: [authorId], references: [id])
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
+
+  @@index([petitionId, deletedAt])
+  @@index([authorId])
+  @@map("comments")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
